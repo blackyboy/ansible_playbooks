@@ -49,3 +49,4 @@
     - name: Report Splunk forwarder Status.
       debug:
          var: service_splunk_status.stdout_lines
+...

@@ -92,3 +92,4 @@
        name: games
        state: absent
        remove: yes
+...

@@ -59,11 +59,22 @@
          - kubelet
        state: present
 
+   - name: Installing Kubernetes Cluster Packages.
+     apt: 
+       name:
+         - kubeadm
+         - kubectl
+         - kubelet
+       state: present
 
+   - name: Enable service kubelet, and enable persistently
+     service: 
+       name: kubelet
+       enabled: yes
 
-
-
-
-
-
-
+   - name: Reboot all the kubernetes nodes.
+     reboot:
+       post_reboot_delay: 10
+       reboot_timeout: 40
+       connect_timeout: 60
+       test_command: uptime

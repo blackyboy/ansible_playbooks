@@ -1,8 +1,9 @@
 ---
-- hosts: k8s
+- hosts: "masters, workers"
   remote_user: ansible
   become: yes
   become_method: sudo
+  become_user: root
   gather_facts: yes
   connection: ssh
   
@@ -41,7 +42,7 @@
          - containerd.io
        state: present
 
-   - name: Enable service httpd, and enable persistently
+   - name: Enable service docker, and enable persistently
      service: 
        name: docker
        enabled: yes
@@ -49,14 +50,6 @@
    - name: Add Google official GPG key
      apt_key:
        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-       state: present
-
-   - name: Installing Kubernetes Cluster Packages.
-     apt: 
-       name:
-         - kubeadm
-         - kubectl
-         - kubelet
        state: present
 
    - name: Installing Kubernetes Cluster Packages.
@@ -78,3 +71,109 @@
        reboot_timeout: 40
        connect_timeout: 60
        test_command: uptime
+
+   - pause: seconds=20
+
+- hosts: masters
+  remote_user: ansible
+  become: yes
+  become_method: sudo
+  become_user: root
+  gather_facts: yes
+  connection: ssh
+
+  vars_prompt:
+   - name: "k8s_admin"
+     prompt: "Which normal user going to manage Kubernetes Cluster?"
+     private: no
+
+   - name: "pod_network_cidr"
+     prompt: "Enter the Pod Network CIDR, example: 192.168.100.0/24"
+     private: no
+
+   - name: "k8s_master_ip"
+     prompt: "Enter the Apiserver advertise address, example: 192.168.0.26"
+     private: no
+
+   - name: "pod_network_manifest_file"
+     prompt: "Enter the Pod network manifest file URL, Your choice could be flannel, weave or calico, etc."
+     private: no
+
+   - name: "rbac_manifest_file"
+     prompt: "Enter the RBAC manifest file URL"
+     private: no 
+
+
+  tasks:
+
+   - name: Intilizing Kubernetes Cluster
+     command: kubeadm init --pod-network-cidr "{{ pod_network_cidr }}"  --apiserver-advertise-address "{{ k8s_master_ip }}"
+     run_once: true
+     delegate_to: "{{ k8s_master_ip }}"
+
+   - pause: seconds=30
+
+   - name: Create directory for kube config.
+     become_user: ansible
+     become_method: sudo
+     become: yes
+     file: 
+       path: /home/{{ k8s_admin }}/.kube
+       state: directory
+       owner: "{{ k8s_admin }}"
+       group: "{{ k8s_admin }}"
+       mode: 0755
+
+   - name: Copy /etc/kubernetes/admin.conf to user's home directory /home/{{ k8s_admin }}/.kube/config.
+     become_user: root
+     become_method: sudo
+     become: yes
+     copy:
+       src: /etc/kubernetes/admin.conf
+       dest: /home/{{ k8s_admin }}/.kube/config
+       remote_src: yes
+       owner: "{{ k8s_admin }}"
+       group: "{{ k8s_admin }}"
+       mode: '0644'
+
+   - pause: seconds=10
+
+   - name: Remove the cache directory.
+     become_user: ansible
+     become_method: sudo
+     become: yes
+     file: 
+       path: /home/{{ k8s_admin }}/.kube/cache
+       state: absent
+
+   - name: Create Pod Network & RBAC.
+     become_user: ansible
+     become_method: sudo
+     become: yes
+     command: "{{ item }}"
+     with_items: 
+        - kubectl apply -f {{ pod_network_manifest_file }}
+        - kubectl apply -f {{ rbac_manifest_file }}
+
+   - pause: seconds=30
+
+   - name: Get the token for joining the nodes with Kuberentes master.
+     command: kubeadm token create  --print-join-command
+     register: kubernetes_join_command
+
+   - debug:
+       var: kubernetes_join_command
+       verbosity: 4
+...
+#   - name: Configure kubectl command auto completion.
+#     lineinfile:
+#       dest: ~/.bashrc
+#       line: "source <(kubectl completion bash)"
+#       run_once: true
+#       delegate_to: "{{ k8s_master_ip }}"
+#       insertafter: EOF
+
+# wget https://docs.projectcalico.org/v3.3/getting-started/kubernetes/installation/hosted/rbac-kdd.yaml
+# wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml
+
+

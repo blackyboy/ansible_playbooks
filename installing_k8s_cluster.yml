@@ -158,12 +158,11 @@
    - pause: seconds=30
 
    - name: Get the token for joining the nodes with Kuberentes master.
-     command: kubeadm token create  --print-join-command
+     shell: kubeadm token create  --print-join-command
      register: kubernetes_join_command
 
    - debug:
-       var: kubernetes_join_command
-       verbosity: 4
+       msg: "{{ kubernetes_join_command.stdout }}"
 ...
 #   - name: Configure kubectl command auto completion.
 #     lineinfile:
@@ -175,5 +174,3 @@
 
 # wget https://docs.projectcalico.org/v3.3/getting-started/kubernetes/installation/hosted/rbac-kdd.yaml
 # wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml
-
-

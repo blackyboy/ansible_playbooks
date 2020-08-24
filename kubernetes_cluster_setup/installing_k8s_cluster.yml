@@ -55,7 +55,7 @@
        update_cache: yes
        state: present
 
-   - name: Enable service docker, and enable persistently
+   - name: Start docker service, and enable persistently
      service: 
        name: docker
        enabled: yes

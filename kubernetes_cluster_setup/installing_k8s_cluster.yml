@@ -8,7 +8,12 @@
   connection: ssh
   
   tasks:
-   
+  
+   - name: Check for existing Kuberenets installation.
+     stat:
+       path: /etc/kubernetes/admin.conf
+       register: k8s_already_exists 
+
    - name: Make the Swap inactive
      command: swapoff -a
 
@@ -34,12 +39,18 @@
        url: https://download.docker.com/linux/ubuntu/gpg
        state: present
 
+   - name: Add Docker Repository
+     apt_repository:
+       repo: deb https://download.docker.com/linux/ubuntu xenial stable
+       state: present
+
    - name: Install Docker Engine.
      apt: 
        name:
          - docker-ce
          - docker-ce-cli
          - containerd.io
+       update_cache: yes
        state: present
 
    - name: Enable service docker, and enable persistently
@@ -52,6 +63,11 @@
        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
        state: present
 
+   - name: Add Kubernetes Repository
+     apt_repository:
+       repo: deb http://apt.kubernetes.io/ kubernetes-xenial main 
+       state: present
+       
    - name: Installing Kubernetes Cluster Packages.
      apt: 
        name:

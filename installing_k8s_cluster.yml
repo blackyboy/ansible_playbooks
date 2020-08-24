@@ -166,7 +166,7 @@
 
    - name: Register worker nodes with variable
      add_host:
-       name: 'workers'
+       name: 'minions'
        groups: "workers"
        kubernetes_join_command_var: "{{ kubernetes_join_command.stdout }}"
 

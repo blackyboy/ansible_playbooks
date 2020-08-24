@@ -163,6 +163,32 @@
 
    - debug:
        msg: "{{ kubernetes_join_command.stdout }}"
+
+   - name: Register worker nodes with variable
+     add_host:
+       name: 'workers'
+       groups: "workers"
+       kubernetes_join_command_var: "{{ kubernetes_join_command.stdout }}"
+
+- hosts: workers
+  remote_user: ansible
+  become: yes
+  become_method: sudo
+  become_user: root
+  gather_facts: yes
+  connection: ssh
+       
+  tasks:
+   
+   - name: Join the Worker nodes with master.
+     become: yes
+     become_method: sudo
+     become_user: root
+     shell: "{{ hostvars['minions']['kubernetes_join_command_var'] }}"
+     register: joined_or_not
+
+   - debug:
+       msg: "{{ joined_or_not.stdout }}"
 ...
 #   - name: Configure kubectl command auto completion.
 #     lineinfile:

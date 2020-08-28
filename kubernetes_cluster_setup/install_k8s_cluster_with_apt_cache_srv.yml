@@ -201,7 +201,6 @@
   gather_facts: yes
   connection: ssh
        
-
   tasks:
 
    - name: Configure kubectl command auto completion.

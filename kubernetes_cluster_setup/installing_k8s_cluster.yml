@@ -8,12 +8,7 @@
   connection: ssh
   
   tasks:
-  
-          #   - name: Check for existing Kuberenets installation.
-          #     stat:
-          #       path: /etc/kubernetes/admin.conf
-          #       register: k8s_already_exists 
-
+   
    - name: Make the Swap inactive
      command: swapoff -a
 
@@ -52,10 +47,9 @@
          - docker-ce
          - docker-ce-cli
          - containerd.io
-       update_cache: yes
        state: present
 
-   - name: Start docker service, and enable persistently
+   - name: Enable service docker, and enable persistently
      service: 
        name: docker
        enabled: yes
@@ -71,7 +65,7 @@
        state: present
        filename: kubernetes
        mode: 0600
-       
+
    - name: Installing Kubernetes Cluster Packages.
      apt: 
        name:
@@ -103,9 +97,6 @@
   connection: ssh
 
   vars_prompt:
-   - name: "k8s_admin"
-     prompt: "Which normal user going to manage Kubernetes Cluster?"
-     private: no
 
    - name: "pod_network_cidr"
      prompt: "Enter the Pod Network CIDR, example: 192.168.100.0/24"
@@ -138,22 +129,22 @@
      become_method: sudo
      become: yes
      file: 
-       path: /home/{{ k8s_admin }}/.kube
+       path: /home/{{ansible_user }}/.kube
        state: directory
-       owner: "{{ k8s_admin }}"
-       group: "{{ k8s_admin }}"
+       owner: "{{ ansible_user }}"
+       group: "{{ ansible_user }}"
        mode: 0755
 
-   - name: Copy /etc/kubernetes/admin.conf to user's home directory /home/{{ k8s_admin }}/.kube/config.
+   - name: Copy /etc/kubernetes/admin.conf to user's home directory /home/{{ ansible_user }}/.kube/config.
      become_user: root
      become_method: sudo
      become: yes
      copy:
        src: /etc/kubernetes/admin.conf
-       dest: /home/{{ k8s_admin }}/.kube/config
+       dest: /home/{{ ansible_user }}/.kube/config
        remote_src: yes
-       owner: "{{ k8s_admin }}"
-       group: "{{ k8s_admin }}"
+       owner: "{{ ansible_user }}"
+       group: "{{ ansible_user }}"
        mode: '0644'
 
    - pause: seconds=10
@@ -163,7 +154,7 @@
      become_method: sudo
      become: yes
      file: 
-       path: /home/{{ k8s_admin }}/.kube/cache
+       path: /home/{{ ansible_user }}/.kube/cache
        state: absent
 
    - name: Create Pod Network & RBAC.
@@ -184,11 +175,8 @@
    - debug:
        msg: "{{ kubernetes_join_command.stdout }}"
 
-   - name: Register worker nodes with variable
-     add_host:
-       name: 'minions'
-       groups: "workers"
-       kubernetes_join_command_var: "{{ kubernetes_join_command.stdout }}"
+   - name: Copy join command to local file.
+     local_action: copy content="{{ kubernetes_join_command.stdout_lines[0] }}" dest="/tmp/kubernetes_join_command" mode=0777
 
 - hosts: workers
   remote_user: ansible
@@ -199,24 +187,40 @@
   connection: ssh
        
   tasks:
-   
+
+   - name: Copy join command to worker nodes.
+     become: yes
+     become_method: sudo
+     become_user: root
+     copy:
+       src: /tmp/kubernetes_join_command
+       dest: /tmp/kubernetes_join_command
+       mode: 0777   
+
    - name: Join the Worker nodes with master.
      become: yes
      become_method: sudo
      become_user: root
-     shell: "{{ hostvars['minions']['kubernetes_join_command_var'] }}"
+     command: sh /tmp/kubernetes_join_command
      register: joined_or_not
 
    - debug:
        msg: "{{ joined_or_not.stdout }}"
-...
-#   - name: Configure kubectl command auto completion.
-#     lineinfile:
-#       dest: ~/.bashrc
-#       line: "source <(kubectl completion bash)"
-#       run_once: true
-#       delegate_to: "{{ k8s_master_ip }}"
-#       insertafter: EOF
 
-# wget https://docs.projectcalico.org/v3.3/getting-started/kubernetes/installation/hosted/rbac-kdd.yaml
-# wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml
+- hosts: masters
+  remote_user: ansible
+  become: yes
+  become_method: sudo
+  become_user: root
+  gather_facts: yes
+  connection: ssh
+       
+
+  tasks:
+
+   - name: Configure kubectl command auto completion.
+     lineinfile:
+       dest: ~/.bashrc
+       line: 'source <(kubectl completion bash)'
+       insertafter: EOF
+...

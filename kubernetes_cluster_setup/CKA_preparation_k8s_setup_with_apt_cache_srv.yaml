@@ -83,9 +83,6 @@
   connection: ssh
 
   vars_prompt:
-   - name: "k8s_admin"
-     prompt: "Which normal user going to manage Kubernetes Cluster?"
-     private: no
 
    - name: "pod_network_cidr"
      prompt: "Enter the Pod Network CIDR, example: 192.168.100.0/24"
@@ -118,22 +115,22 @@
      become_method: sudo
      become: yes
      file: 
-       path: /home/{{ k8s_admin }}/.kube
+       path: /home/{{ansible_user }}/.kube
        state: directory
-       owner: "{{ k8s_admin }}"
-       group: "{{ k8s_admin }}"
+       owner: "{{ ansible_user }}"
+       group: "{{ ansible_user }}"
        mode: 0755
 
-   - name: Copy /etc/kubernetes/admin.conf to user's home directory /home/{{ k8s_admin }}/.kube/config.
+   - name: Copy /etc/kubernetes/admin.conf to user's home directory /home/{{ ansible_user }}/.kube/config.
      become_user: root
      become_method: sudo
      become: yes
      copy:
        src: /etc/kubernetes/admin.conf
-       dest: /home/{{ k8s_admin }}/.kube/config
+       dest: /home/{{ ansible_user }}/.kube/config
        remote_src: yes
-       owner: "{{ k8s_admin }}"
-       group: "{{ k8s_admin }}"
+       owner: "{{ ansible_user }}"
+       group: "{{ ansible_user }}"
        mode: '0644'
 
    - pause: seconds=10
@@ -143,7 +140,7 @@
      become_method: sudo
      become: yes
      file: 
-       path: /home/{{ k8s_admin }}/.kube/cache
+       path: /home/{{ ansible_user }}/.kube/cache
        state: absent
 
    - name: Create Pod Network & RBAC.
@@ -158,22 +155,57 @@
    - pause: seconds=30
 
    - name: Get the token for joining the nodes with Kuberentes master.
-     command: kubeadm token create  --print-join-command
+     shell: kubeadm token create  --print-join-command
      register: kubernetes_join_command
 
    - debug:
-       var: kubernetes_join_command
-       verbosity: 4
+       msg: "{{ kubernetes_join_command.stdout }}"
+
+   - name: Copy join command to local file.
+     local_action: copy content="{{ kubernetes_join_command.stdout_lines[0] }}" dest="/tmp/kubernetes_join_command" mode=0777
+
+- hosts: workers
+  remote_user: ansible
+  become: yes
+  become_method: sudo
+  become_user: root
+  gather_facts: yes
+  connection: ssh
+       
+  tasks:
+
+   - name: Copy join command to worker nodes.
+     become: yes
+     become_method: sudo
+     become_user: root
+     copy:
+       src: /tmp/kubernetes_join_command
+       dest: /tmp/kubernetes_join_command
+       mode: 0777   
+
+   - name: Join the Worker nodes with master.
+     become: yes
+     become_method: sudo
+     become_user: root
+     command: sh /tmp/kubernetes_join_command
+     register: joined_or_not
+
+   - debug:
+       msg: "{{ joined_or_not.stdout }}"
+
+- hosts: masters
+  remote_user: ansible
+  become: yes
+  become_method: sudo
+  become_user: root
+  gather_facts: yes
+  connection: ssh
+       
+  tasks:
+
+   - name: Configure kubectl command auto completion.
+     lineinfile:
+       dest: /home/{{ ansible_user }}/.bashrc
+       line: 'source <(kubectl completion bash)'
+       insertafter: EOF
 ...
-#   - name: Configure kubectl command auto completion.
-#     lineinfile:
-#       dest: ~/.bashrc
-#       line: "source <(kubectl completion bash)"
-#       run_once: true
-#       delegate_to: "{{ k8s_master_ip }}"
-#       insertafter: EOF
-
-# wget https://docs.projectcalico.org/v3.3/getting-started/kubernetes/installation/hosted/rbac-kdd.yaml
-# wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml
-
-

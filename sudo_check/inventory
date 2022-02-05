@@ -1,0 +1,7 @@
+[dev]
+app1
+[prod]
+app2
+[devops:children]
+dev
+prod

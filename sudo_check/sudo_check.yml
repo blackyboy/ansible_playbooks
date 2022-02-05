@@ -1,0 +1,34 @@
+---
+- name: Check for sudo users and their privileges
+  hosts: all
+  vars_files:
+    - sudo_variables.yml
+  tasks:
+    - name: Collect all users for RHEL6 servers
+      shell: cat /etc/passwd | grep -v "{{ item }}" | awk -F ':' '{ if($3 > 500) print $1}' > "{{ remote_path }}"
+      when: ansible_facts['distribution_major_version'] == '6'
+      loop: "{{ ignore_users_list }}"
+
+    - name: Collect all users for RHEL7 or RHEL8 servers
+      shell: cat /etc/passwd | grep -v "{{ item }}" | awk -F ':' '{ if($3 > 1000) print $1}' > "{{ remote_path }}"
+      when: (ansible_facts['distribution_major_version'] == '7') or (ansible_facts['distribution_major_version'] == '8')
+      loop: "{{ ignore_users_list }}"
+
+    - name: Copy the file to ansible host
+      fetch:
+        src: "{{ remote_path }}"
+        dest: "/home/{{ user_list_fetcher }}/users_list/{{ inventory_hostname }}"
+        flat: yes
+
+    - name: Check the sudo privilege for server inventory host and its each user
+      become: true
+      become_method: sudo
+      become_user: root
+      shell: 'sudo -l -U "{{ item }}"'
+      with_lines: cat "/home/{{ user_list_fetcher }}/users_list/{{ inventory_hostname }}"
+      register: sudo_status
+
+    - debug:
+        msg: "{{ item.stdout_lines }}"
+      with_items: "{{ sudo_status.results }}"
+...

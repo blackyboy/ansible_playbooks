@@ -5,6 +5,7 @@ users:
      middle_name: somemiddlename
      last_name: lonston
      group: bobin
+     gid: 5000
      uid: 5000
      shell: /bin/bash
    boblo:
@@ -13,5 +14,6 @@ users:
      middle_name: someothermiddlename
      last_name: lonbob
      group: boblon
+     gid: 5001
      uid: 5001
      shell: /bin/bash

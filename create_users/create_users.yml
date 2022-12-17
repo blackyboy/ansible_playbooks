@@ -11,6 +11,7 @@
    - name: Create the group by reading file.
      group:
        name: "{{ item.value.group }}"
+       gid: "{{ item.value.gid }}"
        state: present
      loop: "{{ lookup('dict', users) }}"
 

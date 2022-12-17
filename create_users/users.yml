@@ -1,0 +1,17 @@
+users:
+   bobin:
+     name: bobin
+     first_name: bobin
+     middle_name: somemiddlename
+     last_name: lonston
+     group: bobin
+     uid: 5000
+     shell: /bin/bash
+   boblo:
+     name: boblo
+     first_name: boblo
+     middle_name: someothermiddlename
+     last_name: lonbob
+     group: boblon
+     uid: 5001
+     shell: /bin/bash

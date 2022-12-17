@@ -1,0 +1,28 @@
+---
+- name: Create list of users on the remote servers
+  hosts: all
+  gather_facts: no
+  vars:
+   password: "{{ lookup('password', 'password-' + item.value.name + ' length=15') }}"
+  vars_files:
+    - users.yml
+
+  tasks:
+   - name: Create the group by reading file.
+     group:
+       name: "{{ item.value.group }}"
+       state: present
+     loop: "{{ lookup('dict', users) }}"
+
+   - name: Create the users by reading file.
+     user:
+       name: "{{ item.value.name }}"
+       password: "{{ password | password_hash('sha512') }}"
+       comment: "{{ item.value.first_name | capitalize }} {{ item.value.middle_name | capitalize }} {{ item.value.last_name | capitalize }}"
+       uid: "{{ item.value.uid }}"
+       group: "{{ item.value.group }}"
+       shell: /bin/bash
+       update_password: on_create
+       state: present
+     loop: "{{ lookup('dict', users) }}"
+...
